@@ -16,7 +16,7 @@
     <header class="w-full bg-white/70 backdrop-blur border-b border-amber-100">
         <div class="max-w-6xl mx-auto flex items-center justify-between px-4 py-3">
             <div class="flex items-center gap-3">
-                <img src="/logo.png" class="w-10 h-10 object-contain" alt="Logo NOKA">
+                <img src="/images/logo.png" class="w-10 h-10 object-contain" alt="Logo NOKA">
                 <div>
                     <p class="text-xs text-amber-700 font-semibold tracking-[0.2em] uppercase">Panel Admin</p>
                     <span class="text-xl font-semibold tracking-wide text-stone-900">Manajemen Admin</span>
@@ -80,7 +80,7 @@
             <div class="p-5 rounded-2xl bg-white/80 border border-stone-100 shadow-sm">
                 <p class="text-xs uppercase tracking-[0.2em] text-stone-400">Terakhir login</p>
                 <div class="flex items-center justify-between mt-3">
-                    <p class="text-sm text-stone-700">{{ $terakhirLogin ?? '—' }}</p>
+                    <p class="text-sm text-stone-700">{{ $terakhirLogin ?? 'â€”' }}</p>
                     <span class="text-xs px-3 py-1 rounded-full bg-stone-50 border border-stone-200 text-stone-700">Waktu</span>
                 </div>
             </div>
@@ -112,7 +112,7 @@
                                 <td class="px-4 py-3 font-semibold text-stone-900">{{ $admin->name ?? '-' }}</td>
                                 <td class="px-4 py-3 text-xs text-stone-600">{{ $admin->email ?? '-' }}</td>
                                 <td class="px-4 py-3 text-xs text-stone-600">{{ $admin->role ?? 'admin' }}</td>
-                                <td class="px-4 py-3 text-xs text-stone-500">{{ $admin->last_login_at ?? '—' }}</td>
+                                <td class="px-4 py-3 text-xs text-stone-500">{{ $admin->last_login_at ?? 'â€”' }}</td>
                                 <td class="px-4 py-3 text-right space-x-2">
                                     <a href="/admin/users/{{ $admin->id }}/edit" class="text-amber-700 font-semibold">Edit</a>
                                     <form action="/admin/users/{{ $admin->id }}" method="POST" class="inline">

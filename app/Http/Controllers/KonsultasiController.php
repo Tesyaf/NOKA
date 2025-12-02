@@ -6,6 +6,7 @@ use App\Models\Konsultasi;
 use App\Models\KonsultasiGejala;
 use App\Models\Gejala;
 use App\Models\Penyakit;
+use App\Services\InferenceEngine;
 use Illuminate\Http\Request;
 
 class KonsultasiController extends Controller
@@ -13,18 +14,24 @@ class KonsultasiController extends Controller
     public function index()
     {
         return view('konsultasi.index', [
-            'gejala' => Gejala::all()
+            'gejala' => Gejala::orderBy('kode_gejala')->get()
         ]);
     }
 
-    public function proses(Request $request)
+    public function proses(Request $request, InferenceEngine $engine)
     {
         $request->validate([
-            'gejala' => 'required|array'
+            'gejala' => 'required|array',
+            'lokasi' => 'nullable|string|max:255',
+            'keterangan' => 'nullable|string|max:500'
         ]);
 
         // Simpan sesi konsultasi
-        $konsultasi = Konsultasi::create([]);
+        $konsultasi = Konsultasi::create([
+            'user_id'   => auth()->id(),
+            'lokasi'    => $request->input('lokasi'),
+            'keterangan'=> $request->input('keterangan'),
+        ]);
 
         foreach ($request->gejala as $id) {
             KonsultasiGejala::create([
@@ -34,42 +41,56 @@ class KonsultasiController extends Controller
             ]);
         }
 
-        // ---- CF Calculation ----
-        $penyakit_list = Penyakit::with('gejala')->get();
-        $nilaiAkhir = [];
+        // Muat relasi gejala yang baru disimpan
+        $konsultasi->load('gejala');
 
-        foreach ($penyakit_list as $penyakit) {
-            $cf_old = 0;
+        // ---- Hybrid inference: rule (CF) + fuzzy scoring ----
+        $hasilInferensi = $engine->inferHybrid($konsultasi->gejala);
+        $peringkat = collect($hasilInferensi)->sortByDesc('combined');
+        $teratas = $peringkat->first();
 
-            foreach ($konsultasi->gejala as $g) {
+        $hasil_id = data_get($teratas, 'penyakit.id_penyakit');
+        $cf_hasil = data_get($teratas, 'combined', 0);
 
-                $rule = $penyakit->gejala->firstWhere('id_gejala', $g->id_gejala);
-
-                if ($rule) {
-                    $cf = $rule->pivot->cf_pakar * $g->pivot->cf_user;
-                    $cf_old = $cf_old + $cf * (1 - $cf_old);
-                }
-            }
-
-            $nilaiAkhir[$penyakit->id_penyakit] = $cf_old;
+        // simpan; jika keyakinan nol/tidak ada hasil, kosongkan id penyakit
+        if (!$hasil_id || $cf_hasil <= 0) {
+            $konsultasi->update([
+                'penyakit_diduga_id' => null,
+                'cf_hasil' => 0,
+            ]);
+        } else {
+            $konsultasi->update([
+                'penyakit_diduga_id' => $hasil_id,
+                'cf_hasil' => $cf_hasil
+            ]);
         }
-
-        // tentukan hasil terbesar
-        arsort($nilaiAkhir);
-        $hasil_id = array_key_first($nilaiAkhir);
-
-        // simpan
-        $konsultasi->update([
-            'penyakit_diduga_id' => $hasil_id,
-            'cf_hasil'           => $nilaiAkhir[$hasil_id]
-        ]);
 
         return redirect()->route('konsultasi.hasil', $konsultasi->id_konsultasi);
     }
 
-    public function hasil($id)
+    public function hasil($id, InferenceEngine $engine)
     {
         $konsultasi = Konsultasi::with(['hasil', 'gejala'])->findOrFail($id);
-        return view('konsultasi.hasil', compact('konsultasi'));
+
+        $hybrid = $engine->inferHybrid($konsultasi->gejala);
+        $peringkat = collect($hybrid)->sortByDesc('combined');
+        $detailPenyakit = $konsultasi->penyakit_diduga_id
+            ? ($hybrid[$konsultasi->penyakit_diduga_id] ?? null)
+            : null;
+        if (!$detailPenyakit) {
+            $detailPenyakit = $peringkat->first();
+        }
+        $backward = $konsultasi->hasil
+            ? $engine->backward($konsultasi->gejala, $konsultasi->hasil)
+            : null;
+        $lowConfidence = !$detailPenyakit || data_get($detailPenyakit, 'combined', 0) <= 0;
+
+        return view('konsultasi.hasil', [
+            'konsultasi' => $konsultasi,
+            'detailPenyakit' => $detailPenyakit,
+            'backward' => $backward,
+            'peringkat' => $peringkat,
+            'lowConfidence' => $lowConfidence,
+        ]);
     }
 }

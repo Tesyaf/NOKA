@@ -19,6 +19,11 @@ class Konsultasi extends Model
         'keterangan',
     ];
 
+    protected $casts = [
+        'tanggal_konsultasi' => 'datetime',
+        'cf_hasil' => 'float',
+    ];
+
     public function gejala()
     {
         return $this->belongsToMany(Gejala::class, 'konsultasi_gejala', 'konsultasi_id', 'gejala_id')

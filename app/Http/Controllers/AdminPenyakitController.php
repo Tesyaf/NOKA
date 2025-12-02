@@ -25,7 +25,15 @@ class AdminPenyakitController extends Controller
             'nama_penyakit' => 'required'
         ]);
 
-        Penyakit::create($request->all());
+        Penyakit::create($request->only([
+            'kode_penyakit',
+            'nama_penyakit',
+            'penyebab',
+            'deskripsi',
+            'pengendalian',
+            'pencegahan',
+            'gambar',
+        ]));
 
         return redirect()->route('penyakit.index')
             ->with('success', 'Data penyakit berhasil ditambahkan.');
@@ -39,10 +47,19 @@ class AdminPenyakitController extends Controller
     public function update(Request $request, Penyakit $penyakit)
     {
         $request->validate([
+            'kode_penyakit' => 'required|unique:penyakit,kode_penyakit,' . $penyakit->id_penyakit . ',id_penyakit',
             'nama_penyakit' => 'required'
         ]);
 
-        $penyakit->update($request->all());
+        $penyakit->update($request->only([
+            'kode_penyakit',
+            'nama_penyakit',
+            'penyebab',
+            'deskripsi',
+            'pengendalian',
+            'pencegahan',
+            'gambar',
+        ]));
 
         return redirect()->route('penyakit.index')
             ->with('success', 'Data penyakit berhasil diperbarui.');

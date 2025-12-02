@@ -15,7 +15,7 @@
     <div class="w-full max-w-lg">
         <div class="bg-white/80 border border-amber-100 rounded-3xl shadow-lg p-8 space-y-6">
             <div class="flex items-center gap-3">
-                <img src="/logo.png" class="w-12 h-12 object-contain" alt="Logo NOKA">
+                <img src="/images/logo.png" class="w-12 h-12 object-contain" alt="Logo NOKA">
                 <div>
                     <p class="text-xs text-amber-700 font-semibold tracking-[0.2em] uppercase">Panel Admin</p>
                     <h1 class="text-2xl font-semibold text-stone-900">Keluar dari NOKA</h1>

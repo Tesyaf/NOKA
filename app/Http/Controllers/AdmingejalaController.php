@@ -21,11 +21,11 @@ class AdminGejalaController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'kode_gejala' => 'required|unique:gejala',
+            'kode_gejala' => 'required|unique:gejala,kode_gejala',
             'nama_gejala' => 'required'
         ]);
 
-        Gejala::create($request->all());
+        Gejala::create($request->only(['kode_gejala', 'nama_gejala', 'deskripsi']));
 
         return redirect()->route('gejala.index')
             ->with('success', 'Data gejala berhasil ditambahkan.');
@@ -39,10 +39,11 @@ class AdminGejalaController extends Controller
     public function update(Request $request, Gejala $gejala)
     {
         $request->validate([
+            'kode_gejala' => 'required|unique:gejala,kode_gejala,' . $gejala->id_gejala . ',id_gejala',
             'nama_gejala' => 'required'
         ]);
 
-        $gejala->update($request->all());
+        $gejala->update($request->only(['kode_gejala', 'nama_gejala', 'deskripsi']));
 
         return redirect()->route('gejala.index')
             ->with('success', 'Data gejala diperbarui.');

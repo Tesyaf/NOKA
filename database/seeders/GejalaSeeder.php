@@ -6,7 +6,7 @@ use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 use App\Models\Gejala;
 
-class PenyakitSeeder extends Seeder
+class GejalaSeeder extends Seeder
 {
     /**
      * Run the database seeds.
