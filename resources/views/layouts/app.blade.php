@@ -17,6 +17,7 @@
             <nav class="hidden md:flex gap-5 text-sm font-medium">
                 <a href="{{ url('/') }}" class="hover:text-amber-700">Beranda</a>
                 <a href="{{ route('konsultasi.index') }}" class="hover:text-amber-700">Konsultasi</a>
+                <a href="{{ route('penyakit.public.index') }}" class="hover:text-amber-700">Daftar Penyakit</a>
                 @auth
                     @if(auth()->user()->is_admin)
                         <a href="{{ url('/admin') }}" class="hover:text-amber-700">Admin</a>

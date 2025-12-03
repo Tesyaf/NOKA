@@ -7,8 +7,13 @@ use App\Http\Controllers\AdminGejalaController;
 use App\Http\Controllers\AdminPenyakitController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\KonsultasiController;
+use App\Http\Controllers\PenyakitController;
 
 Route::get('/', fn() => view('welcome'))->name('home');
+
+// ========= Halaman Publik =========
+Route::get('/penyakit', [PenyakitController::class, 'index'])->name('penyakit.public.index');
+Route::get('/penyakit/{penyakit}', [PenyakitController::class, 'show'])->name('penyakit.public.show');
 
 // ========= Auth Admin =========
 Route::middleware('guest')->group(function () {
