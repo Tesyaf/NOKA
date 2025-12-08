@@ -35,6 +35,33 @@
 
             <div class="space-y-3">
                 <p class="text-sm font-semibold text-stone-900 flex items-center gap-2">
+                    <span class="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center text-[11px] font-bold text-blue-700">Metode</span>
+                    Pilih metode deteksi penyakit
+                </p>
+                <div class="grid md:grid-cols-2 gap-3 text-sm">
+                    <label class="flex items-start gap-3 rounded-xl border-2 border-stone-200 bg-stone-50/60 px-4 py-3 hover:border-blue-200 cursor-pointer transition"
+                           onclick="this.classList.add('border-blue-300'); document.querySelector('input[value=backward]').checked && this.classList.remove('border-stone-200')">
+                        <input type="radio" name="metode_deteksi" value="backward" class="mt-1 rounded border-stone-300 text-blue-500 focus:ring-blue-400"
+                            {{ old('metode_deteksi', 'backward') === 'backward' ? 'checked' : '' }}>
+                        <span>
+                            <span class="font-semibold text-stone-900 block">Backward Chaining</span>
+                            <span class="text-xs text-stone-500">Deteksi berdasarkan gejala yang dipilih. Cocok untuk diagnosis spesifik.</span>
+                        </span>
+                    </label>
+                    <label class="flex items-start gap-3 rounded-xl border-2 border-stone-200 bg-stone-50/60 px-4 py-3 hover:border-green-200 cursor-pointer transition"
+                           onclick="this.classList.add('border-green-300'); document.querySelector('input[value=forward]').checked && this.classList.remove('border-stone-200')">
+                        <input type="radio" name="metode_deteksi" value="forward" class="mt-1 rounded border-stone-300 text-green-500 focus:ring-green-400"
+                            {{ old('metode_deteksi') === 'forward' ? 'checked' : '' }}>
+                        <span>
+                            <span class="font-semibold text-stone-900 block">Forward Chaining</span>
+                            <span class="text-xs text-stone-500">Deteksi berdasarkan penyakit. Cepat menemukan penyakit yang paling mungkin.</span>
+                        </span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="space-y-3">
+                <p class="text-sm font-semibold text-stone-900 flex items-center gap-2">
                     <span class="w-6 h-6 rounded-full bg-amber-100 flex items-center justify-center text-[11px] font-bold text-amber-700">Gejala</span>
                     Pilih gejala yang teramati
                 </p>

@@ -17,15 +17,25 @@
             <span class="font-semibold text-stone-800">Lokasi:</span>
             <span>{{ $konsultasi->lokasi ?? '-' }}</span>
         </div>
-            <div class="flex items-center gap-2 px-3 py-1 rounded-full bg-stone-50 border border-stone-200">
-                <span class="font-semibold text-stone-800">Tanggal:</span>
-                <span>{{ $konsultasi->tanggal_konsultasi?->format('d M Y H:i') }}</span>
-            </div>
-            <div class="flex items-center gap-2 px-3 py-1 rounded-full bg-stone-50 border border-stone-200">
-                <span class="font-semibold text-stone-800">Catatan:</span>
-                <span>{{ $konsultasi->keterangan ?? '-' }}</span>
-            </div>
+        <div class="flex items-center gap-2 px-3 py-1 rounded-full bg-stone-50 border border-stone-200">
+            <span class="font-semibold text-stone-800">Tanggal:</span>
+            <span>{{ $konsultasi->tanggal_konsultasi?->format('d M Y H:i') }}</span>
         </div>
+        <div class="flex items-center gap-2 px-3 py-1 rounded-full bg-stone-50 border border-stone-200">
+            <span class="font-semibold text-stone-800">Catatan:</span>
+            <span>{{ $konsultasi->keterangan ?? '-' }}</span>
+        </div>
+        <div class="flex items-center gap-2 px-3 py-1 rounded-full {{ $metode === 'forward' ? 'bg-green-50 border-green-200' : 'bg-blue-50 border-blue-200' }} border">
+            <span class="font-semibold {{ $metode === 'forward' ? 'text-green-700' : 'text-blue-700' }}">Metode:</span>
+            <span class="{{ $metode === 'forward' ? 'text-green-600' : 'text-blue-600' }}">
+                @if($metode === 'forward')
+                    Forward Chaining
+                @else
+                    Backward Chaining
+                @endif
+            </span>
+        </div>
+    </div>
     </section>
 
     <section class="grid lg:grid-cols-[2fr,1.2fr] gap-6 items-start mt-6">
@@ -38,11 +48,22 @@
                     </h2>
                 </div>
                 <div class="text-right space-y-1">
-                    <p class="text-xs text-stone-500">Tingkat keyakinan (hybrid)</p>
+                    <p class="text-xs text-stone-500">
+                        @if($metode === 'forward')
+                            Confidence Forward
+                        @else
+                            Confidence Backward
+                        @endif
+                    </p>
                     <p class="text-lg font-semibold text-lime-700">
                         {{ $konsultasi->cf_hasil ? number_format($konsultasi->cf_hasil * 100, 1) . '%' : '-' }}
                     </p>
-                    @if($detailPenyakit)
+                    @if($konsultasi->cf_backward && $konsultasi->cf_forward)
+                        <p class="text-[11px] text-stone-500 space-y-0.5">
+                            <span class="block">Backward: {{ number_format($konsultasi->cf_backward * 100, 1) }}%</span>
+                            <span class="block">Forward: {{ number_format($konsultasi->cf_forward * 100, 1) }}%</span>
+                        </p>
+                    @elseif($detailPenyakit && $metode === 'backward')
                         <p class="text-[11px] text-stone-500">
                             CF: {{ number_format($detailPenyakit['cf'] * 100, 1) }}% · Fuzzy: {{ number_format($detailPenyakit['fuzzy_score'] * 100, 1) }}%
                         </p>
@@ -200,15 +221,26 @@
 
         @if(isset($peringkat) && $peringkat->count())
             <section class="mt-4 bg-white/80 border border-stone-100 rounded-3xl shadow-sm p-5 space-y-3">
-                <p class="text-sm font-semibold text-stone-800">Peringkat hasil (Hybrid)</p>
+                <p class="text-sm font-semibold text-stone-800">
+                    Peringkat hasil
+                    @if($metode === 'forward')
+                        (Forward Chaining)
+                    @else
+                        (Backward - Hybrid)
+                    @endif
+                </p>
                 <div class="overflow-x-auto">
                     <table class="min-w-full text-sm text-left text-stone-700">
                         <thead class="text-xs uppercase text-stone-500 bg-stone-50">
                             <tr>
                                 <th class="px-3 py-2">Penyakit</th>
-                                <th class="px-3 py-2 text-right">Combined</th>
-                                <th class="px-3 py-2 text-right">CF</th>
-                                <th class="px-3 py-2 text-right">Fuzzy</th>
+                                @if($metode === 'forward')
+                                    <th class="px-3 py-2 text-right">CF Score</th>
+                                @else
+                                    <th class="px-3 py-2 text-right">Combined</th>
+                                    <th class="px-3 py-2 text-right">CF</th>
+                                    <th class="px-3 py-2 text-right">Fuzzy</th>
+                                @endif
                                 <th class="px-3 py-2 text-center">Rules aktif</th>
                             </tr>
                         </thead>
@@ -216,9 +248,13 @@
                             @foreach($peringkat->take(5) as $row)
                                 <tr>
                                     <td class="px-3 py-2 font-semibold text-stone-900">{{ $row['penyakit']->nama_penyakit ?? '-' }}</td>
-                                    <td class="px-3 py-2 text-right">{{ number_format($row['combined'] * 100, 1) }}%</td>
-                                    <td class="px-3 py-2 text-right text-stone-600">{{ number_format($row['cf'] * 100, 1) }}%</td>
-                                    <td class="px-3 py-2 text-right text-stone-600">{{ number_format($row['fuzzy_score'] * 100, 1) }}%</td>
+                                    @if($metode === 'forward')
+                                        <td class="px-3 py-2 text-right text-lime-700 font-semibold">{{ number_format($row['cf'] * 100, 1) }}%</td>
+                                    @else
+                                        <td class="px-3 py-2 text-right text-lime-700 font-semibold">{{ number_format($row['combined'] * 100, 1) }}%</td>
+                                        <td class="px-3 py-2 text-right text-stone-600">{{ number_format($row['cf'] * 100, 1) }}%</td>
+                                        <td class="px-3 py-2 text-right text-stone-600">{{ number_format($row['fuzzy_score'] * 100, 1) }}%</td>
+                                    @endif
                                     <td class="px-3 py-2 text-center text-stone-600">{{ count($row['matched'] ?? []) }}</td>
                                 </tr>
                             @endforeach

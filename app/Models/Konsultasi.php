@@ -15,6 +15,9 @@ class Konsultasi extends Model
         'tanggal_konsultasi',
         'penyakit_diduga_id',
         'cf_hasil',
+        'metode_deteksi',
+        'cf_backward',
+        'cf_forward',
         'lokasi',
         'keterangan',
     ];
@@ -22,6 +25,8 @@ class Konsultasi extends Model
     protected $casts = [
         'tanggal_konsultasi' => 'datetime',
         'cf_hasil' => 'float',
+        'cf_backward' => 'float',
+        'cf_forward' => 'float',
     ];
 
     public function gejala()
