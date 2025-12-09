@@ -140,7 +140,7 @@ class InferenceEngine
         $known = [];
         $questions = [];
 
-        foreach ($penyakit->gejala as $gejalaRule) {
+        foreach ($penyakit->gejala->sortByDesc(fn ($gejala) => $gejala->pivot->cf_pakar) as $gejalaRule) {
             $userFact = $userGejalaIndex->get($gejalaRule->id_gejala);
 
             if ($userFact) {

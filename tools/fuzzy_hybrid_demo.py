@@ -31,8 +31,7 @@ def infer(pakar_rules: List[Dict], user_gejala: List[int], alpha: float = 0.6):
 
 
 if __name__ == "__main__":
-    # Example: 3 gejala dengan bobot pakar
     rules = [{"id": 1, "weight": 0.7}, {"id": 2, "weight": 0.5}, {"id": 3, "weight": 0.4}]
-    user = [1, 3]  # user memilih gejala 1 dan 3
+    user = [1, 3]
     result = infer(rules, user)
     print("Hybrid result:", result)

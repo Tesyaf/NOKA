@@ -13,19 +13,52 @@ class KonsultasiController extends Controller
 {
     public function index()
     {
+        $penyakit = Penyakit::with('gejala:id_gejala')->orderBy('kode_penyakit')->get();
+        $gejala = Gejala::orderBy('kode_gejala')->get();
+        $gejalaPenyakitMap = [];
+
+        foreach ($penyakit as $row) {
+            foreach ($row->gejala as $gejalaPenyakit) {
+                $gejalaPenyakitMap[$gejalaPenyakit->id_gejala][] = $row->id_penyakit;
+            }
+        }
+
         return view('konsultasi.index', [
-            'gejala' => Gejala::orderBy('kode_gejala')->get()
+            'gejala' => $gejala,
+            'penyakit' => $penyakit,
+            'gejalaPenyakitMap' => $gejalaPenyakitMap,
         ]);
     }
 
     public function proses(Request $request, InferenceEngine $engine)
     {
         $request->validate([
-            'gejala' => 'required|array',
+            'gejala' => 'required|array|min:1',
+            'gejala.*' => 'exists:gejala,id_gejala',
             'metode_deteksi' => 'required|in:backward,forward',
+            'penyakit_id' => 'required_if:metode_deteksi,backward|exists:penyakit,id_penyakit',
+            'cf_user' => 'nullable|array',
+            'cf_user.*' => 'nullable|numeric|min:0|max:1',
             'lokasi' => 'nullable|string|max:255',
             'keterangan' => 'nullable|string|max:500'
         ]);
+
+        $metode = $request->input('metode_deteksi', 'backward');
+        $selectedGejalaIds = collect($request->input('gejala', []))->map(fn ($id) => (int) $id)->unique();
+        $cfUserInput = collect($request->input('cf_user', []));
+        $penyakitDipilih = null;
+
+        if ($metode === 'backward') {
+            $penyakitDipilih = Penyakit::with('gejala')->findOrFail($request->input('penyakit_id'));
+            $allowedGejala = $penyakitDipilih->gejala->pluck('id_gejala');
+            $selectedGejalaIds = $selectedGejalaIds->intersect($allowedGejala);
+
+            if ($selectedGejalaIds->isEmpty()) {
+                return back()->withInput()->withErrors([
+                    'gejala' => 'Pilih minimal satu gejala yang sesuai dengan penyakit yang dipilih.'
+                ]);
+            }
+        }
 
         // Simpan sesi konsultasi
         $konsultasi = Konsultasi::create([
@@ -35,18 +68,19 @@ class KonsultasiController extends Controller
             'keterangan'     => $request->input('keterangan'),
         ]);
 
-        foreach ($request->gejala as $id) {
+        foreach ($selectedGejalaIds as $id) {
+            $cfUser = (float) $cfUserInput->get($id, 1);
+            $cfUser = max(0, min(1, $cfUser));
+
             KonsultasiGejala::create([
                 'konsultasi_id' => $konsultasi->id_konsultasi,
                 'gejala_id'     => $id,
-                'cf_user'       => 1.0
+                'cf_user'       => $cfUser
             ]);
         }
 
         // Muat relasi gejala yang baru disimpan
         $konsultasi->load('gejala');
-
-        $metode = $request->input('metode_deteksi', 'backward');
 
         if ($metode === 'forward') {
             // ---- Forward chaining: hitung semua penyakit ----
@@ -59,19 +93,18 @@ class KonsultasiController extends Controller
             $cf_forward = $cf_hasil;
             $cf_backward = null;
         } else {
-            // ---- Backward chaining (dengan hybrid untuk scoring) ----
-            $hasilInferensi = $engine->inferHybrid($konsultasi->gejala);
-            $peringkat = collect($hasilInferensi)->sortByDesc('combined');
-            $teratas = $peringkat->first();
+            // ---- Backward chaining: mulai dari hipotesis penyakit yang dipilih ----
+            $penyakitTarget = $penyakitDipilih ?? Penyakit::with('gejala')->find($request->input('penyakit_id'));
+            $hasilBackward = $penyakitTarget ? $engine->backward($konsultasi->gejala, $penyakitTarget) : null;
 
-            $hasil_id = data_get($teratas, 'penyakit.id_penyakit');
-            $cf_hasil = data_get($teratas, 'combined', 0);
+            $hasil_id = $penyakitTarget?->id_penyakit;
+            $cf_hasil = data_get($hasilBackward, 'cf', 0);
             $cf_backward = $cf_hasil;
             $cf_forward = null;
         }
 
         // Simpan; jika keyakinan nol/tidak ada hasil, kosongkan id penyakit
-        if (!$hasil_id || $cf_hasil <= 0) {
+        if ($metode !== 'backward' && (!$hasil_id || $cf_hasil <= 0)) {
             $konsultasi->update([
                 'penyakit_diduga_id' => null,
                 'cf_hasil' => 0,
@@ -108,19 +141,34 @@ class KonsultasiController extends Controller
             $backward = null;
             $lowConfidence = !$detailPenyakit || data_get($detailPenyakit, 'cf', 0) <= 0;
         } else {
-            // ---- Backward chaining with hybrid scoring ----
+            // ---- Backward chaining: tampilkan evaluasi hipotesis penyakit yang dipilih ----
+            $penyakitTarget = $konsultasi->hasil;
             $hybrid = $engine->inferHybrid($konsultasi->gejala);
             $peringkat = collect($hybrid)->sortByDesc('combined');
-            $detailPenyakit = $konsultasi->penyakit_diduga_id
-                ? ($hybrid[$konsultasi->penyakit_diduga_id] ?? null)
+
+            $backward = $penyakitTarget
+                ? $engine->backward($konsultasi->gejala, $penyakitTarget)
                 : null;
-            if (!$detailPenyakit) {
-                $detailPenyakit = $peringkat->first();
+
+            $hybridDetail = ($penyakitTarget && isset($hybrid[$penyakitTarget->id_penyakit]))
+                ? $hybrid[$penyakitTarget->id_penyakit]
+                : null;
+
+            if ($backward && $penyakitTarget) {
+                $detailPenyakit = [
+                    'penyakit' => $penyakitTarget,
+                    'matched' => $backward['known'],
+                    'missing' => $backward['questions'],
+                    'cf_backward' => $backward['cf'],
+                    'cf' => data_get($hybridDetail, 'cf', $backward['cf']),
+                    'fuzzy_score' => data_get($hybridDetail, 'fuzzy_score'),
+                    'combined' => data_get($hybridDetail, 'combined', $backward['cf']),
+                ];
+            } else {
+                $detailPenyakit = $hybridDetail ?? $peringkat->first();
             }
-            $backward = $konsultasi->hasil
-                ? $engine->backward($konsultasi->gejala, $konsultasi->hasil)
-                : null;
-            $lowConfidence = !$detailPenyakit || data_get($detailPenyakit, 'combined', 0) <= 0;
+
+            $lowConfidence = !$backward || data_get($backward, 'cf', 0) <= 0;
         }
 
         return view('konsultasi.hasil', [

@@ -48,24 +48,21 @@
                     </h2>
                 </div>
                 <div class="text-right space-y-1">
-                    <p class="text-xs text-stone-500">
-                        @if($metode === 'forward')
-                            Confidence Forward
-                        @else
-                            Confidence Backward
-                        @endif
-                    </p>
+                    <p class="text-xs text-stone-500">{{ $metode === 'forward' ? 'Confidence Forward' : 'Confidence Backward' }}</p>
                     <p class="text-lg font-semibold text-lime-700">
-                        {{ $konsultasi->cf_hasil ? number_format($konsultasi->cf_hasil * 100, 1) . '%' : '-' }}
+                        {{ $konsultasi->cf_hasil !== null ? number_format($konsultasi->cf_hasil * 100, 1) . '%' : '-' }}
                     </p>
-                    @if($konsultasi->cf_backward && $konsultasi->cf_forward)
+                    @if($konsultasi->cf_backward !== null && $konsultasi->cf_forward !== null)
                         <p class="text-[11px] text-stone-500 space-y-0.5">
                             <span class="block">Backward: {{ number_format($konsultasi->cf_backward * 100, 1) }}%</span>
                             <span class="block">Forward: {{ number_format($konsultasi->cf_forward * 100, 1) }}%</span>
                         </p>
                     @elseif($detailPenyakit && $metode === 'backward')
                         <p class="text-[11px] text-stone-500">
-                            CF: {{ number_format($detailPenyakit['cf'] * 100, 1) }}% · Fuzzy: {{ number_format($detailPenyakit['fuzzy_score'] * 100, 1) }}%
+                            Hybrid cek: {{ number_format(($detailPenyakit['combined'] ?? 0) * 100, 1) }}%
+                            @if(isset($detailPenyakit['fuzzy_score']))
+                                <span class="block">CF aturan {{ number_format(($detailPenyakit['cf'] ?? 0) * 100, 1) }}% / Fuzzy {{ number_format($detailPenyakit['fuzzy_score'] * 100, 1) }}%</span>
+                            @endif
                         </p>
                     @endif
                 </div>
@@ -76,7 +73,11 @@
                     <p class="font-semibold text-stone-800">Gejala terpilih</p>
                     <ul class="list-disc list-inside text-stone-600 space-y-1">
                         @forelse ($konsultasi->gejala as $gejala)
-                            <li><span class="font-semibold text-stone-800">{{ $gejala->kode_gejala }}</span> - {{ $gejala->nama_gejala }}</li>
+                            <li>
+                                <span class="font-semibold text-stone-800">{{ $gejala->kode_gejala }}</span>
+                                - {{ $gejala->nama_gejala }}
+                                <span class="text-xs text-stone-500">(Keyakinan Anda {{ number_format(($gejala->pivot->cf_user ?? 0) * 100, 0) }}%)</span>
+                            </li>
                         @empty
                             <li>-</li>
                         @endforelse
@@ -111,7 +112,7 @@
         <div class="bg-white/80 border border-amber-100 rounded-3xl shadow-sm p-5 space-y-3">
             <p class="text-sm font-semibold text-stone-800">Rekomendasi utama</p>
             <ul class="list-disc list-inside text-stone-700 text-sm space-y-1">
-                <li>Fokus pada penyakit: <span class="font-semibold text-stone-900">{{ $konsultasi->hasil->nama_penyakit ?? '-' }}</span> (keyakinan {{ $konsultasi->cf_hasil ? number_format($konsultasi->cf_hasil * 100, 1) . '%' : '-' }})</li>
+                <li>Fokus pada penyakit: <span class="font-semibold text-stone-900">{{ $konsultasi->hasil->nama_penyakit ?? '-' }}</span> (keyakinan {{ $konsultasi->cf_hasil !== null ? number_format($konsultasi->cf_hasil * 100, 1) . '%' : '-' }})</li>
                 @if(!empty($detailPenyakit['matched']))
                     <li>{{ count($detailPenyakit['matched']) }} gejala mendukung hasil ini; lanjutkan pemantauan gejala sejenis untuk validasi.</li>
                 @endif

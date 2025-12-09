@@ -39,17 +39,15 @@
                     Pilih metode deteksi penyakit
                 </p>
                 <div class="grid md:grid-cols-2 gap-3 text-sm">
-                    <label class="flex items-start gap-3 rounded-xl border-2 border-stone-200 bg-stone-50/60 px-4 py-3 hover:border-blue-200 cursor-pointer transition"
-                           onclick="this.classList.add('border-blue-300'); document.querySelector('input[value=backward]').checked && this.classList.remove('border-stone-200')">
+                    <label class="flex items-start gap-3 rounded-xl border-2 border-stone-200 bg-stone-50/60 px-4 py-3 hover:border-blue-200 cursor-pointer transition">
                         <input type="radio" name="metode_deteksi" value="backward" class="mt-1 rounded border-stone-300 text-blue-500 focus:ring-blue-400"
                             {{ old('metode_deteksi', 'backward') === 'backward' ? 'checked' : '' }}>
                         <span>
                             <span class="font-semibold text-stone-900 block">Backward Chaining</span>
-                            <span class="text-xs text-stone-500">Deteksi berdasarkan gejala yang dipilih. Cocok untuk diagnosis spesifik.</span>
+                            <span class="text-xs text-stone-500">Mulai dari pilihan penyakit, kemudian jawab gejala-gejala yang diminta.</span>
                         </span>
                     </label>
-                    <label class="flex items-start gap-3 rounded-xl border-2 border-stone-200 bg-stone-50/60 px-4 py-3 hover:border-green-200 cursor-pointer transition"
-                           onclick="this.classList.add('border-green-300'); document.querySelector('input[value=forward]').checked && this.classList.remove('border-stone-200')">
+                    <label class="flex items-start gap-3 rounded-xl border-2 border-stone-200 bg-stone-50/60 px-4 py-3 hover:border-green-200 cursor-pointer transition">
                         <input type="radio" name="metode_deteksi" value="forward" class="mt-1 rounded border-stone-300 text-green-500 focus:ring-green-400"
                             {{ old('metode_deteksi') === 'forward' ? 'checked' : '' }}>
                         <span>
@@ -60,18 +58,65 @@
                 </div>
             </div>
 
+            <div id="penyakit-wrapper" class="space-y-2 {{ old('metode_deteksi', 'backward') === 'backward' ? '' : 'hidden' }}">
+                <p class="text-sm font-semibold text-stone-900 flex items-center gap-2">
+                    <span class="w-6 h-6 rounded-full bg-sky-100 flex items-center justify-center text-[11px] font-bold text-sky-700">Pilih</span>
+                    Pilih penyakit terlebih dahulu (khusus backward)
+                </p>
+                <select id="penyakit_id" name="penyakit_id"
+                        class="w-full rounded-xl border border-stone-200 bg-stone-50/60 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-300 focus:border-amber-300">
+                    <option value="">-- Pilih penyakit yang ingin diuji --</option>
+                    @foreach ($penyakit as $row)
+                        <option value="{{ $row->id_penyakit }}" {{ old('penyakit_id') == $row->id_penyakit ? 'selected' : '' }}>
+                            {{ $row->kode_penyakit }} - {{ $row->nama_penyakit }}
+                        </option>
+                    @endforeach
+                </select>
+                <p class="text-[11px] text-stone-500">Pada backward chaining, gejala yang ditampilkan akan mengikuti penyakit yang dipilih.</p>
+            </div>
+
             <div class="space-y-3">
                 <p class="text-sm font-semibold text-stone-900 flex items-center gap-2">
                     <span class="w-6 h-6 rounded-full bg-amber-100 flex items-center justify-center text-[11px] font-bold text-amber-700">Gejala</span>
-                    Pilih gejala yang teramati
+                    Pilih gejala yang teramati & tingkat keyakinan
                 </p>
-                <div class="grid md:grid-cols-2 gap-3 text-sm">
+                <div id="gejala-container" class="grid md:grid-cols-2 gap-3 text-sm">
+                    <div id="gejala-placeholder" class="col-span-2 text-xs text-stone-500 bg-stone-50 border border-dashed border-stone-200 rounded-xl px-3 py-2 hidden">
+                        Pilih penyakit terlebih dahulu untuk menampilkan daftar gejala yang relevan.
+                    </div>
                     @foreach ($gejala as $item)
-                        <label class="flex items-start gap-2 rounded-xl border border-stone-200 bg-stone-50/60 px-3 py-2 hover:border-amber-200">
-                            <input type="checkbox" name="gejala[]" value="{{ $item->id_gejala }}" class="mt-1 rounded border-stone-300 text-amber-500 focus:ring-amber-400"
-                                {{ in_array($item->id_gejala, old('gejala', [])) ? 'checked' : '' }}>
-                            <span><span class="font-semibold text-stone-900">{{ $item->kode_gejala }}</span> - {{ $item->nama_gejala }}</span>
-                        </label>
+                        @php
+                            $selected = in_array($item->id_gejala, old('gejala', []));
+                            $cfValue = old('cf_user.' . $item->id_gejala, '1');
+                            $penyakitsForGejala = $gejalaPenyakitMap[$item->id_gejala] ?? [];
+                        @endphp
+                        <div data-gejala-id="{{ $item->id_gejala }}"
+                             data-penyakit="{{ implode(',', $penyakitsForGejala) }}"
+                             class="gejala-card flex items-start justify-between gap-3 rounded-xl border border-stone-200 bg-stone-50/60 px-3 py-2 hover:border-amber-200">
+                            <label for="gejala-{{ $item->id_gejala }}" class="flex items-start gap-2 cursor-pointer">
+                                <input id="gejala-{{ $item->id_gejala }}" type="checkbox" name="gejala[]" value="{{ $item->id_gejala }}"
+                                       class="gejala-checkbox mt-1 rounded border-stone-300 text-amber-500 focus:ring-amber-400"
+                                       data-cf-target="cf-{{ $item->id_gejala }}"
+                                       {{ $selected ? 'checked' : '' }}>
+                                <span>
+                                    <span class="font-semibold text-stone-900">{{ $item->kode_gejala }}</span>
+                                    <span class="block text-stone-700">{{ $item->nama_gejala }}</span>
+                                </span>
+                            </label>
+                            <div class="flex flex-col items-end gap-1 text-[11px]">
+                                <span class="text-stone-500">Keyakinan</span>
+                                <select id="cf-{{ $item->id_gejala }}" name="cf_user[{{ $item->id_gejala }}]"
+                                        class="cf-select rounded-lg border border-stone-200 bg-white px-2 py-1 text-[11px] text-stone-700 focus:outline-none focus:ring-amber-300 {{ $selected ? '' : 'opacity-50' }}"
+                                        {{ $selected ? '' : 'disabled' }}>
+                                    <option value="1" {{ $cfValue == '1' ? 'selected' : '' }}>Sangat yakin (1.0)</option>
+                                    <option value="0.8" {{ $cfValue == '0.8' ? 'selected' : '' }}>Yakin (0.8)</option>
+                                    <option value="0.6" {{ $cfValue == '0.6' ? 'selected' : '' }}>Cukup yakin (0.6)</option>
+                                    <option value="0.4" {{ $cfValue == '0.4' ? 'selected' : '' }}>Ragu (0.4)</option>
+                                    <option value="0.2" {{ $cfValue == '0.2' ? 'selected' : '' }}>Sedikit ragu (0.2)</option>
+                                    <option value="0" {{ $cfValue == '0' ? 'selected' : '' }}>Tidak tahu (0)</option>
+                                </select>
+                            </div>
+                        </div>
                     @endforeach
                 </div>
             </div>
@@ -98,4 +143,55 @@
             Hasil diagnosa NOKA bersifat pendukung keputusan dan tidak menggantikan pemeriksaan langsung oleh pakar atau penyuluh pertanian.
         </p>
     </section>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const metodeInputs = document.querySelectorAll('input[name="metode_deteksi"]');
+            const penyakitSelect = document.getElementById('penyakit_id');
+            const gejalaCards = Array.from(document.querySelectorAll('[data-gejala-id]'));
+            const placeholder = document.getElementById('gejala-placeholder');
+            const penyakitWrapper = document.getElementById('penyakit-wrapper');
+
+            const syncCfSelect = (checkbox) => {
+                const targetId = checkbox.dataset.cfTarget;
+                const select = document.getElementById(targetId);
+                if (!select) return;
+                const active = checkbox.checked;
+                select.disabled = !active;
+                select.classList.toggle('opacity-50', !active);
+            };
+
+            document.querySelectorAll('.gejala-checkbox').forEach((checkbox) => {
+                checkbox.addEventListener('change', () => syncCfSelect(checkbox));
+                syncCfSelect(checkbox);
+            });
+
+            const updateVisibility = () => {
+                const metode = document.querySelector('input[name="metode_deteksi"]:checked')?.value;
+                const backward = metode === 'backward';
+                const selectedPenyakit = penyakitSelect?.value;
+
+                if (penyakitWrapper) {
+                    penyakitWrapper.classList.toggle('hidden', !backward);
+                }
+
+                gejalaCards.forEach((card) => {
+                    const allowed = (card.dataset.penyakit || '').split(',').filter(Boolean);
+                    const canShow = !backward || !selectedPenyakit || allowed.includes(selectedPenyakit);
+                    card.classList.toggle('hidden', backward && selectedPenyakit && !canShow);
+                    if (backward && !selectedPenyakit) {
+                        card.classList.add('hidden');
+                    }
+                });
+
+                if (placeholder) {
+                    placeholder.classList.toggle('hidden', !backward || !!selectedPenyakit);
+                }
+            };
+
+            metodeInputs.forEach((input) => input.addEventListener('change', updateVisibility));
+            penyakitSelect?.addEventListener('change', updateVisibility);
+            updateVisibility();
+        });
+    </script>
 @endsection
