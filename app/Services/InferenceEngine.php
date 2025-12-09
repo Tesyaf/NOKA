@@ -8,7 +8,34 @@ use Illuminate\Support\Collection;
 class InferenceEngine
 {
     /**
-     * Hybrid inference: rule-based CF + fuzzy-like weighted scoring.
+     * Fungsi keanggotaan triangular/trapesium untuk input 0-1 (Mamdani).
+     * low/medium/high digunakan untuk fuzzifikasi cf_user.
+     */
+    private array $fuzzyMembership = [
+        'low' => [
+            [0.0, 0.0, 0.35],
+            [0.0, 0.35, 0.5],
+        ],
+        'medium' => [
+            [0.25, 0.5, 0.75],
+        ],
+        'high' => [
+            [0.5, 0.75, 1.0],
+            [0.65, 1.0, 1.0],
+        ],
+    ];
+
+    /**
+     * Titik representatif (centroid sederhana) untuk defuzzifikasi.
+     */
+    private array $fuzzyOutputCenters = [
+        'low' => 0.25,
+        'medium' => 0.55,
+        'high' => 0.85,
+    ];
+
+    /**
+     * Hybrid inference: rule-based CF + fuzzy Mamdani (fuzzifikasi + defuzzifikasi).
      *
      * @param Collection $userGejala Koleksi Gejala dengan pivot cf_user (0-1)
      * @param float $alpha Bobot kombinasi untuk CF (0-1). Sisanya untuk skor fuzzy.
@@ -22,21 +49,26 @@ class InferenceEngine
 
         foreach ($penyakitList as $penyakit) {
             $cf = 0.0;
-            $scoreWeighted = 0.0;
-            $sumWeight = 0.0;
             $matched = [];
             $missing = [];
+            $fuzzyAgg = [
+                'low' => 0.0,
+                'medium' => 0.0,
+                'high' => 0.0,
+            ];
 
             foreach ($penyakit->gejala as $gejalaRule) {
                 $weight = $gejalaRule->pivot->cf_pakar;
-                $sumWeight += $weight;
                 $userFact = $userGejalaIndex->get($gejalaRule->id_gejala);
 
                 if ($userFact) {
                     $userCf = $userFact->pivot->cf_user ?? 1;
                     $ruleCf = $weight * $userCf;
                     $cf = $this->combineCf($cf, $ruleCf);
-                    $scoreWeighted += $ruleCf;
+                    $membership = $this->fuzzifyValue($userCf);
+                    $expectedLevel = $this->expectedLevelFromWeight($weight);
+                    $fire = $this->fuzzyFireStrength($expectedLevel, $membership, $weight);
+                    $fuzzyAgg[$expectedLevel] = max($fuzzyAgg[$expectedLevel], $fire);
 
                     $matched[] = [
                         'id' => $gejalaRule->id_gejala,
@@ -45,6 +77,9 @@ class InferenceEngine
                         'cf_rule' => $weight,
                         'cf_user' => $userCf,
                         'cf_hasil' => $ruleCf,
+                        'fuzzy_in' => $membership,
+                        'fuzzy_expect' => $expectedLevel,
+                        'fuzzy_fire' => round($fire, 4),
                     ];
                 } else {
                     $missing[] = [
@@ -56,7 +91,7 @@ class InferenceEngine
                 }
             }
 
-            $fuzzyScore = $sumWeight > 0 ? $scoreWeighted / $sumWeight : 0;
+            $fuzzyScore = $this->defuzzify($fuzzyAgg);
             $combined = ($alpha * $cf) + ((1 - $alpha) * $fuzzyScore);
 
             $results[$penyakit->id_penyakit] = [
@@ -66,6 +101,7 @@ class InferenceEngine
                 'combined' => round($combined, 4),
                 'matched' => $matched,
                 'missing' => $missing,
+                'fuzzy_agg' => $fuzzyAgg,
             ];
         }
 
@@ -176,5 +212,89 @@ class InferenceEngine
     {
         // Rumus kombinasi CF: CFold + CFnew * (1 - CFold)
         return $current + $new * (1 - $current);
+    }
+
+    /**
+     * Triangular membership function μ(x; a,b,c).
+     */
+    private function tri(float $x, float $a, float $b, float $c): float
+    {
+        if ($x <= $a || $x >= $c) {
+            return 0.0;
+        }
+        if ($x === $b) {
+            return 1.0;
+        }
+        return $x < $b
+            ? ($x - $a) / ($b - $a)
+            : ($c - $x) / ($c - $b);
+    }
+
+    /**
+     * Hitung derajat keanggotaan untuk label tertentu.
+     */
+    private function mu(string $label, float $x): float
+    {
+        $triangles = $this->fuzzyMembership[$label] ?? [];
+        $values = [];
+
+        foreach ($triangles as $triangle) {
+            [$a, $b, $c] = $triangle;
+            $values[] = $this->tri($x, $a, $b, $c);
+        }
+
+        return count($values) ? max($values) : 0.0;
+    }
+
+    /**
+     * Fuzzifikasi cf_user menjadi low/medium/high.
+     */
+    private function fuzzifyValue(float $value): array
+    {
+        return [
+            'low' => $this->mu('low', $value),
+            'medium' => $this->mu('medium', $value),
+            'high' => $this->mu('high', $value),
+        ];
+    }
+
+    /**
+     * Map bobot pakar ke level keanggotaan yang diharapkan.
+     */
+    private function expectedLevelFromWeight(float $weight): string
+    {
+        if ($weight >= 0.7) {
+            return 'high';
+        }
+        if ($weight >= 0.45) {
+            return 'medium';
+        }
+        return 'low';
+    }
+
+    /**
+     * Strength aturan: derajat input untuk level yang diharapkan dibatasi bobot pakar.
+     */
+    private function fuzzyFireStrength(string $expected, array $membership, float $weight): float
+    {
+        $degree = $membership[$expected] ?? 0.0;
+        return min($degree, $weight);
+    }
+
+    /**
+     * Defuzzifikasi Mamdani (centroid diskrit).
+     */
+    private function defuzzify(array $agg): float
+    {
+        $numerator = 0.0;
+        $denominator = 0.0;
+
+        foreach ($agg as $label => $degree) {
+            $center = $this->fuzzyOutputCenters[$label] ?? 0.0;
+            $numerator += $degree * $center;
+            $denominator += $degree;
+        }
+
+        return $denominator > 0 ? $numerator / $denominator : 0.0;
     }
 }
