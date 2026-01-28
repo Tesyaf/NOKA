@@ -67,8 +67,17 @@ class InferenceEngine
                     $cf = $this->combineCf($cf, $ruleCf);
                     $membership = $this->fuzzifyValue($userCf);
                     $expectedLevel = $this->expectedLevelFromWeight($weight);
-                    $fire = $this->fuzzyFireStrength($expectedLevel, $membership, $weight);
-                    $fuzzyAgg[$expectedLevel] = max($fuzzyAgg[$expectedLevel], $fire);
+                    $fireExpected = $this->fuzzyFireStrength($expectedLevel, $membership, $weight);
+                    $fuzzyAgg[$expectedLevel] = max($fuzzyAgg[$expectedLevel], $fireExpected);
+
+                    // Tambahkan fallback ke label dominan user untuk mencegah semua fuzzy = 0 saat persepsi rendah
+                    $bestLabel = $this->dominantLabel($membership);
+                    $fireBest = 0.0;
+                    if ($bestLabel !== $expectedLevel) {
+                        $fireBest = min($membership[$bestLabel] ?? 0.0, $weight * 0.8);
+                        $fuzzyAgg[$bestLabel] = max($fuzzyAgg[$bestLabel], $fireBest);
+                    }
+                    $fire = max($fireExpected, $fireBest);
 
                     $matched[] = [
                         'id' => $gejalaRule->id_gejala,
@@ -296,5 +305,21 @@ class InferenceEngine
         }
 
         return $denominator > 0 ? $numerator / $denominator : 0.0;
+    }
+
+    /**
+     * Ambil label dengan derajat keanggotaan tertinggi.
+     */
+    private function dominantLabel(array $membership): string
+    {
+        $bestLabel = 'low';
+        $bestValue = -INF;
+        foreach ($membership as $label => $value) {
+            if ($value > $bestValue) {
+                $bestValue = $value;
+                $bestLabel = $label;
+            }
+        }
+        return $bestLabel;
     }
 }

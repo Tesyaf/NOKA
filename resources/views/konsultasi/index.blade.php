@@ -80,6 +80,7 @@
                     <span class="w-6 h-6 rounded-full bg-amber-100 flex items-center justify-center text-[11px] font-bold text-amber-700">Gejala</span>
                     Pilih gejala yang teramati & tingkat keyakinan
                 </p>
+                <p class="text-xs text-stone-500">Jika ragu, pilih opsi "Belum yakin / perlu cek lagi". Nilai terendah adalah 0.1 (tidak ada angka 0 supaya gejala tetap dipertimbangkan).</p>
                 <div id="gejala-container" class="grid md:grid-cols-2 gap-3 text-sm">
                     <div id="gejala-placeholder" class="col-span-2 text-xs text-stone-500 bg-stone-50 border border-dashed border-stone-200 rounded-xl px-3 py-2 hidden">
                         Pilih penyakit terlebih dahulu untuk menampilkan daftar gejala yang relevan.
@@ -87,7 +88,8 @@
                     @foreach ($gejala as $item)
                         @php
                             $selected = in_array($item->id_gejala, old('gejala', []));
-                            $cfValue = old('cf_user.' . $item->id_gejala, '1');
+                            $cfValue = (float) old('cf_user.' . $item->id_gejala, '1');
+                            $cfValue = $cfValue < 0.1 ? 0.1 : $cfValue;
                             $penyakitsForGejala = $gejalaPenyakitMap[$item->id_gejala] ?? [];
                         @endphp
                         <div data-gejala-id="{{ $item->id_gejala }}"
@@ -104,16 +106,16 @@
                                 </span>
                             </label>
                             <div class="flex flex-col items-end gap-1 text-[11px]">
-                                <span class="text-stone-500">Keyakinan</span>
+                                <span class="text-stone-500">Seberapa yakin?</span>
                                 <select id="cf-{{ $item->id_gejala }}" name="cf_user[{{ $item->id_gejala }}]"
                                         class="cf-select rounded-lg border border-stone-200 bg-white px-2 py-1 text-[11px] text-stone-700 focus:outline-none focus:ring-amber-300 {{ $selected ? '' : 'opacity-50' }}"
                                         {{ $selected ? '' : 'disabled' }}>
-                                    <option value="1" {{ $cfValue == '1' ? 'selected' : '' }}>Sangat yakin (1.0)</option>
-                                    <option value="0.8" {{ $cfValue == '0.8' ? 'selected' : '' }}>Yakin (0.8)</option>
-                                    <option value="0.6" {{ $cfValue == '0.6' ? 'selected' : '' }}>Cukup yakin (0.6)</option>
-                                    <option value="0.4" {{ $cfValue == '0.4' ? 'selected' : '' }}>Ragu (0.4)</option>
-                                    <option value="0.2" {{ $cfValue == '0.2' ? 'selected' : '' }}>Sedikit ragu (0.2)</option>
-                                    <option value="0" {{ $cfValue == '0' ? 'selected' : '' }}>Tidak tahu (0)</option>
+                                    <option value="1" {{ $cfValue == 1.0 ? 'selected' : '' }}>Sangat yakin</option>
+                                    <option value="0.8" {{ $cfValue == 0.8 ? 'selected' : '' }}>Yakin</option>
+                                    <option value="0.6" {{ $cfValue == 0.6 ? 'selected' : '' }}>Cukup yakin</option>
+                                    <option value="0.4" {{ $cfValue == 0.4 ? 'selected' : '' }}>Kurang yakin</option>
+                                    <option value="0.2" {{ $cfValue == 0.2 ? 'selected' : '' }}>Ragu-ragu</option>
+                                    <option value="0.1" {{ $cfValue == 0.1 ? 'selected' : '' }}>Belum yakin / perlu cek lagi</option>
                                 </select>
                             </div>
                         </div>
@@ -151,6 +153,7 @@
             const gejalaCards = Array.from(document.querySelectorAll('[data-gejala-id]'));
             const placeholder = document.getElementById('gejala-placeholder');
             const penyakitWrapper = document.getElementById('penyakit-wrapper');
+            const gejalaCheckboxes = Array.from(document.querySelectorAll('.gejala-checkbox'));
 
             const syncCfSelect = (checkbox) => {
                 const targetId = checkbox.dataset.cfTarget;
@@ -165,6 +168,19 @@
                 checkbox.addEventListener('change', () => syncCfSelect(checkbox));
                 syncCfSelect(checkbox);
             });
+
+            const resetGejalaSelections = () => {
+                gejalaCheckboxes.forEach((checkbox) => {
+                    checkbox.checked = false;
+                    const targetId = checkbox.dataset.cfTarget;
+                    const select = document.getElementById(targetId);
+                    if (select) {
+                        select.value = '1';
+                        select.disabled = true;
+                        select.classList.add('opacity-50');
+                    }
+                });
+            };
 
             const updateVisibility = () => {
                 const metode = document.querySelector('input[name="metode_deteksi"]:checked')?.value;
@@ -189,8 +205,15 @@
                 }
             };
 
-            metodeInputs.forEach((input) => input.addEventListener('change', updateVisibility));
-            penyakitSelect?.addEventListener('change', updateVisibility);
+            metodeInputs.forEach((input) => input.addEventListener('change', () => {
+                resetGejalaSelections();
+                updateVisibility();
+            }));
+
+            penyakitSelect?.addEventListener('change', () => {
+                resetGejalaSelections();
+                updateVisibility();
+            });
             updateVisibility();
         });
     </script>

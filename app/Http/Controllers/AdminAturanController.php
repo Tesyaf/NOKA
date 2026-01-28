@@ -28,7 +28,7 @@ class AdminAturanController extends Controller
         $request->validate([
             'penyakit_id' => 'required|exists:penyakit,id_penyakit',
             'gejala_id'   => 'required|exists:gejala,id_gejala',
-            'cf_pakar'    => 'required|numeric|min:0|max:1',
+            'cf_pakar'    => 'required|numeric|min:0.1|max:1',
             'keterangan'  => 'nullable|string',
         ]);
 

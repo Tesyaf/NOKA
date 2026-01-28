@@ -40,8 +40,10 @@
         <div class="grid md:grid-cols-2 gap-4">
             <div class="space-y-1">
                 <label class="text-sm font-semibold text-stone-800">CF Pakar</label>
-                <input type="number" name="cf_pakar" step="0.01" min="0" max="1" value="{{ old('cf_pakar', 0.8) }}" required
-                       class="w-full rounded-xl border border-stone-200 bg-stone-50/60 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-300 focus:border-amber-300">
+                <input type="number" name="cf_pakar" step="0.01" min="0.1" max="1" value="{{ old('cf_pakar', 0.8) }}" required
+                       class="w-full rounded-xl border border-stone-200 bg-stone-50/60 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-300 focus:border-amber-300"
+                       aria-describedby="cf-help">
+                <p id="cf-help" class="text-xs text-stone-500">Gunakan rentang 0.1 - 1 (0.1 = sangat ragu, 1 = sangat yakin).</p>
             </div>
         </div>
 
